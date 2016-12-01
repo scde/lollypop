@@ -150,7 +150,10 @@ class SettingsDialog:
         switch_librefm.set_state(Lp().settings.get_value('use-librefm'))
 
         switch_artwork_tags = builder.get_object('switch_artwork_tags')
-        if GLib.find_program_in_path("kid3-cli") is None:
+        # For flatpak, check only in /usr/bin
+        kid3 = GLib.find_program_in_path("kid3-cli") is not None or\
+            Gio.File_new_for_path("/usr/bin/kid3-cli").query_exists()
+        if not kid3:
             grid = builder.get_object('grid_behaviour')
             h = grid.child_get_property(switch_artwork_tags, 'height')
             w = grid.child_get_property(switch_artwork_tags, 'width')

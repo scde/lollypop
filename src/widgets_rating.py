@@ -10,7 +10,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, Gio
 
 from lollypop.objects import Track
 from lollypop.define import Lp
@@ -111,9 +111,15 @@ class RatingWidget(Gtk.Bin):
         self._object.set_popularity(pop)
         # Save to tags if needed
         if Lp().settings.get_value('save-to-tags') and\
-                GLib.find_program_in_path("kid3-cli") is not None and\
                 isinstance(self._object, Track) and\
                 not self._object.is_web:
+            # For flatpak, check only in /usr/bin
+            if GLib.find_program_in_path("kid3-cli") is not None:
+                kid3 = "kid3-cli"
+            elif Gio.File_new_for_path("/usr/bin/kid3-cli").query_exists():
+                kid3 = "/usr/bin/kid3-cli"
+            else:
+                return True
             if pop == 0:
                 value = 0
             elif pop == 1:
@@ -127,7 +133,7 @@ class RatingWidget(Gtk.Bin):
             else:
                 value = 255
             path = GLib.filename_from_uri(self._object.uri)[0]
-            argv = ["kid3-cli", "-c", "select all", "-c",
+            argv = [kid3, "-c", "select all", "-c",
                     "set pop: %s" % value, path, None]
             GLib.spawn_sync(None, argv, None,
                             GLib.SpawnFlags.SEARCH_PATH, None)

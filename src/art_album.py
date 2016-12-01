@@ -241,13 +241,11 @@ class AlbumArt(BaseArt, TagReader):
         """
         try:
             arturi = None
-            save_to_tags = Lp().settings.get_value('save-to-tags') and\
-                GLib.find_program_in_path("kid3-cli") is not None
             album = Album(album_id)
 
             uri_count = Lp().albums.get_uri_count(album.uri)
             filename = self.get_album_cache_name(album) + ".jpg"
-            if save_to_tags:
+            if Lp().settings.get_value('save-to-tags'):
                 t = Thread(target=self.__save_artwork_tags,
                            args=(data, album))
                 t.daemon = True
@@ -267,7 +265,7 @@ class AlbumArt(BaseArt, TagReader):
                 arturi = album.uri + "/" + self.__favorite
             f = Gio.File.new_for_uri(arturi)
             # Update cover file if exists even if we have written to tags
-            if not save_to_tags or f.query_exists():
+            if not Lp().settings.get_value('save-to-tags') or f.query_exists():
                 stream = Gio.MemoryInputStream.new_from_data(data, None)
                 pixbuf = GdkPixbuf.Pixbuf.new_from_stream_at_scale(
                                                                stream,
@@ -304,9 +302,16 @@ class AlbumArt(BaseArt, TagReader):
                     f.trash()
                 except:
                     f.delete(None)
-            if Lp().settings.get_value('save-to-tags') and\
-                    GLib.find_program_in_path("kid3-cli") is not None:
-                argv = ["kid3-cli", "-c", "select all", "-c",
+            # Remove from tags
+            if Lp().settings.get_value('save-to-tags'):
+                # For flatpak, check only in /usr/bin
+                if GLib.find_program_in_path("kid3-cli") is not None:
+                    kid3 = "kid3-cli"
+                elif Gio.File_new_for_path("/usr/bin/kid3-cli").query_exists():
+                    kid3 = "/usr/bin/kid3-cli"
+                else:
+                    return
+                argv = [kid3, "-c", "select all", "-c",
                         "set picture:'' ''"]
                 for uri in Lp().albums.get_track_uris(album.id, [], []):
                     try:
@@ -393,6 +398,13 @@ class AlbumArt(BaseArt, TagReader):
         """
         if album.is_web:
             return
+        # For flatpak, check only in /usr/bin
+        if GLib.find_program_in_path("kid3-cli") is not None:
+            kid3 = "kid3-cli"
+        elif Gio.File_new_for_path("/usr/bin/kid3-cli").query_exists():
+            kid3 = "/usr/bin/kid3-cli"
+        else:
+            return
         stream = Gio.MemoryInputStream.new_from_data(data, None)
         pixbuf = GdkPixbuf.Pixbuf.new_from_stream_at_scale(stream,
                                                            ArtSize.MONSTER,
@@ -404,7 +416,7 @@ class AlbumArt(BaseArt, TagReader):
         del pixbuf
         f = Gio.File.new_for_path("/tmp/lollypop_cover_tags.jpg")
         if f.query_exists():
-            argv = ["kid3-cli", "-c", "select all", "-c",
+            argv = [kid3, "-c", "select all", "-c",
                     "set picture:'/tmp/lollypop_cover_tags.jpg' ''"]
             for uri in Lp().albums.get_track_uris(album.id, [], []):
                 try:
